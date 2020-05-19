@@ -3,6 +3,7 @@ package goatcounter
 import (
 	"context"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -241,11 +242,86 @@ func (h *HitStats) List(
 		l = l.Since("get max")
 	}
 
+	// Add totals.
+	// TODO: doubles page load time, hmm
+	{
+		var tc []struct {
+			Hour        time.Time `db:"hour"`
+			Total       int       `db:"total"`
+			TotalUnique int       `db:"total_unique"`
+		}
+		err := db.SelectContext(ctx, &tc,
+			`select hour, total, total_unique from hit_counts
+				where site=$1 and hour>=$2 and hour<=$3
+				order by hour asc `,
+			site.ID, start.Format(zdb.Date), end.Format(zdb.Date))
+		if err != nil {
+			return 0, 0, 0, 0, 0, false, err
+		}
+		l = l.Since("total overview query")
+
+		totalst := HitStat{
+			Path:  "/totals",
+			Title: "Totals",
+		}
+		stats := make(map[string]Stat)
+		for _, t := range tc {
+			d := t.Hour.Format("2006-01-02")
+			hour, _ := strconv.ParseInt(t.Hour.Format("15"), 10, 32)
+			s, ok := stats[d]
+			if !ok {
+				s = Stat{
+					Day:          d,
+					Hourly:       make([]int, 24),
+					HourlyUnique: make([]int, 24),
+				}
+			}
+
+			s.Hourly[hour] += t.Total
+			s.HourlyUnique[hour] += t.TotalUnique
+			s.Daily += t.Total
+			s.DailyUnique += t.TotalUnique
+
+			totalst.Count += t.Total
+			totalst.CountUnique += t.TotalUnique
+
+			stats[d] = s
+		}
+
+		// TODO: we don't have to get the max values above if the totals isn't
+		// enabled.
+		for _, v := range stats {
+			totalst.Stats = append(totalst.Stats, v)
+			if daily && v.Daily > max {
+				max = v.Daily
+			}
+			if !daily {
+				for _, x := range v.Hourly {
+					if x > max {
+						max = x
+					}
+				}
+			}
+		}
+
+		sort.Slice(totalst.Stats, func(i, j int) bool {
+			return totalst.Stats[i].Day < totalst.Stats[j].Day
+		})
+
+		xx := []HitStat{totalst}
+		fillBlankDays(xx, start, end)
+		applyOffset(xx, *site)
+
+		hh = append(xx, hh...)
+		l = l.Since("total overview correct")
+	}
+
 	syncutil.Wait(ctx, &wg)
 	if totalErr != nil {
 		return 0, 0, 0, 0, 0, false, errors.Wrap(totalErr, "HitStats.List get total")
 	}
 
+	*h = hh
 	return total, totalUnique, totalDisplay, totalUniqueDisplay, max, more, nil
 }
 
