@@ -308,7 +308,6 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		pages                           goatcounter.HitStats
 		total, totalDisplay             int
 		totalUnique, totalUniqueDisplay int
-		max                             int
 		morePages                       bool
 		pagesErr                        error
 	)
@@ -317,8 +316,22 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		defer zlog.Recover()
 		defer wg.Done()
 
-		total, totalUnique, totalDisplay, totalUniqueDisplay, max, morePages, pagesErr = pages.List(r.Context(), start, end, filter, nil, daily)
+		total, totalUnique, totalDisplay, totalUniqueDisplay, morePages, pagesErr = pages.List(
+			r.Context(), start, end, filter, nil, daily)
 		//l = l.Since("pages.List")
+	}()
+
+	var (
+		totalPages goatcounter.HitStat
+		max        int
+		totalErr   error
+	)
+	wg.Add(1)
+	go func() {
+		defer zlog.Recover()
+		defer wg.Done()
+
+		max, totalErr = totalPages.Totals(r.Context(), start, end, daily)
 	}()
 
 	var browsers goatcounter.Stats
@@ -386,6 +399,9 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 	if pagesErr != nil {
 		return pagesErr
 	}
+	if totalErr != nil {
+		return totalErr
+	}
 
 	l = startl.Since("get data")
 
@@ -400,6 +416,7 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		PeriodEnd          time.Time
 		Filter             string
 		Pages              goatcounter.HitStats
+		TotalPages         goatcounter.HitStat
 		MorePages          bool
 		Refs               goatcounter.HitStats
 		MoreRefs           bool
@@ -424,10 +441,11 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		ForcedDaily        bool
 		Max                int
 	}{newGlobals(w, r), cd, sr, r.URL.Query().Get("hl-period"), start, end,
-		filter, pages, morePages, refs, moreRefs, total, totalUnique,
-		totalDisplay, totalUniqueDisplay, browsers, totalBrowsers, systems,
-		totalSystems, subs, sizeStat, totalSize, locStat, totalLoc, showMoreLoc,
-		topRefs, totalTopRefs, showMoreRefs, daily, forcedDaily, max})
+		filter, pages, totalPages, morePages, refs, moreRefs, total,
+		totalUnique, totalDisplay, totalUniqueDisplay, browsers, totalBrowsers,
+		systems, totalSystems, subs, sizeStat, totalSize, locStat, totalLoc,
+		showMoreLoc, topRefs, totalTopRefs, showMoreRefs, daily, forcedDaily,
+		max})
 	l.Since("zhttp.Template")
 	return x
 }
@@ -596,7 +614,7 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 	daily, forcedDaily := getDaily(r, start, end)
 
 	var pages goatcounter.HitStats
-	totalHits, totalUnique, totalDisplay, totalUniqueDisplay, max, more, err := pages.List(r.Context(), start, end,
+	totalHits, totalUnique, totalDisplay, totalUniqueDisplay, more, err := pages.List(r.Context(), start, end,
 		r.URL.Query().Get("filter"), strings.Split(r.URL.Query().Get("exclude"), ","), daily)
 	if err != nil {
 		return err
@@ -610,13 +628,13 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 		PeriodEnd   time.Time
 		Daily       bool
 		ForcedDaily bool
-		Max         int
 
 		// Dummy values so template won't error out.
+		Max      int
 		Refs     bool
 		ShowRefs string
 	}{r.Context(), pages, goatcounter.MustGetSite(r.Context()), start, end,
-		daily, forcedDaily, max, false, ""})
+		daily, forcedDaily, 0, false, ""})
 	if err != nil {
 		return err
 	}

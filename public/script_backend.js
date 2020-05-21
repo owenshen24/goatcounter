@@ -229,9 +229,9 @@
 	// Update the page list from ajax request on pagination/filter.
 	var update_pages = function(data, from_filter) {
 		if (from_filter)
-			$('.pages-list .count-list-pages > tbody').html(data.rows);
+			$('.pages-list .count-list-pages > tbody.pages').html(data.rows);
 		else
-			$('.pages-list .count-list-pages > tbody').append(data.rows);
+			$('.pages-list .count-list-pages > tbody.pages').append(data.rows);
 
 		highlight_filter($('#filter-paths').val())
 		$('.pages-list .load-more').css('display', data.more ? 'inline' : 'none')
@@ -262,7 +262,7 @@
 	var highlight_filter = function(s) {
 		if (s === '')
 			return;
-		$('.pages-list .count-list-pages > tbody').find('.rlink, .page-title:not(.no-title)').each(function(_, elem) {
+		$('.pages-list .count-list-pages > tbody.pages').find('.rlink, .page-title:not(.no-title)').each(function(_, elem) {
 			elem.innerHTML = elem.innerHTML.replace(new RegExp('' + quote_re(s) + '', 'gi'), '<b>$&</b>');
 		});
 	};

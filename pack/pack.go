@@ -12444,9 +12444,9 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 	// Update the page list from ajax request on pagination/filter.
 	var update_pages = function(data, from_filter) {
 		if (from_filter)
-			$('.pages-list .count-list-pages > tbody').html(data.rows);
+			$('.pages-list .count-list-pages > tbody.pages').html(data.rows);
 		else
-			$('.pages-list .count-list-pages > tbody').append(data.rows);
+			$('.pages-list .count-list-pages > tbody.pages').append(data.rows);
 
 		highlight_filter($('#filter-paths').val())
 		$('.pages-list .load-more').css('display', data.more ? 'inline' : 'none')
@@ -12477,7 +12477,7 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 	var highlight_filter = function(s) {
 		if (s === '')
 			return;
-		$('.pages-list .count-list-pages > tbody').find('.rlink, .page-title:not(.no-title)').each(function(_, elem) {
+		$('.pages-list .count-list-pages > tbody.pages').find('.rlink, .page-title:not(.no-title)').each(function(_, elem) {
 			elem.innerHTML = elem.innerHTML.replace(new RegExp('' + quote_re(s) + '', 'gi'), '<b>$&</b>');
 		});
 	};
@@ -13302,7 +13302,7 @@ form .err  { color: red; display: block; }
 
 .count-list td:first-child {  /* Count */
 	text-align: right;
-	width: 5em;
+	width: 5rem;
 }
 .count-list td[colspan="3"] {  /* "nothing to display" */
 	text-align: left;
@@ -13310,22 +13310,35 @@ form .err  { color: red; display: block; }
 }
 
 .count-list td:nth-child(2) {  /* Path */
-	width: 20em;
+	width: 20rem;
 }
 
 .count-list.count-list-refs td:nth-child(1) {
 	text-align: right;
-	width: 4em;
+	width: 4rem;
 }
 .count-list.count-list-refs td:nth-child(2) {
 	text-align: right;
-	width: 4em;
+	width: 4rem;
 }
 
 .count-list.count-list-refs td:nth-child(3) {
 	width: auto;
 	word-break: break-all; /* don't make it wider for very long urls */
 }
+
+/* Totals */
+.count-list .totals {
+	border-bottom: 1px solid #999;
+	background-color: #f7f7f7;
+}
+
+.count-list .totals td:nth-child(2) {
+	font-weight: bold;
+}
+
+/* Hack to add margin to tbody */
+.count-list .pages::before { content: ''; display: block; height: 1rem; }
 
 .label-event { background-color: #f6f3da; border-radius: 1em; padding: .1em .3em; }
 
@@ -15724,7 +15737,24 @@ Martin
 		</header>
 
 		<table class="count-list count-list-pages" data-max="{{.Max}}" data-scale="{{.Max}}">
-			<tbody>{{template "_backend_pages.gohtml" .}}</tbody>
+			<tbody class="totals">
+				<tr>
+					<td>
+						<span title="Visits">{{nformat .TotalPages.CountUnique $.Site}}</span><br>
+						<span title="Pageviews" class="views">{{nformat .TotalPages.Count $.Site}}</span><br>
+					<td>
+						Total
+					</td>
+					<td>
+						<div class="chart chart-bar">
+							<span class="half"></span>
+							{{bar_chart .Context .TotalPages.Stats .Max .Daily}}
+						</div>
+					</td>
+				</tr>
+			</tbody>
+
+			<tbody class="pages">{{template "_backend_pages.gohtml" .}}</tbody>
 		</table>
 
 		<a href="#" class="load-more" {{if not .MorePages}}style="display: none"{{end}}>Show more</a>
