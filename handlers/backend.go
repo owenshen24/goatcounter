@@ -331,7 +331,7 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		defer zlog.Recover()
 		defer wg.Done()
 
-		max, totalErr = totalPages.Totals(r.Context(), start, end, daily)
+		max, totalErr = totalPages.Totals(r.Context(), start, end, filter, daily)
 	}()
 
 	var browsers goatcounter.Stats
@@ -614,8 +614,17 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 	daily, forcedDaily := getDaily(r, start, end)
 
 	var pages goatcounter.HitStats
-	totalHits, totalUnique, totalDisplay, totalUniqueDisplay, more, err := pages.List(r.Context(), start, end,
-		r.URL.Query().Get("filter"), strings.Split(r.URL.Query().Get("exclude"), ","), daily)
+	totalHits, totalUnique, totalDisplay, totalUniqueDisplay, more, err := pages.List(
+		r.Context(), start, end,
+		r.URL.Query().Get("filter"),
+		strings.Split(r.URL.Query().Get("exclude"), ","),
+		daily)
+	if err != nil {
+		return err
+	}
+
+	// TODO: changing max doesn't apply properly? Hmm
+	max, err := strconv.ParseInt(r.URL.Query().Get("max"), 10, 64)
 	if err != nil {
 		return err
 	}
@@ -628,13 +637,13 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 		PeriodEnd   time.Time
 		Daily       bool
 		ForcedDaily bool
+		Max         int
 
 		// Dummy values so template won't error out.
-		Max      int
 		Refs     bool
 		ShowRefs string
 	}{r.Context(), pages, goatcounter.MustGetSite(r.Context()), start, end,
-		daily, forcedDaily, 0, false, ""})
+		daily, forcedDaily, int(max), false, ""})
 	if err != nil {
 		return err
 	}
@@ -651,6 +660,7 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 		"total_display":        totalDisplay,
 		"total_unique":         totalUnique,
 		"total_unique_display": totalUniqueDisplay,
+		"max":                  max,
 		"more":                 more,
 	})
 }

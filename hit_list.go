@@ -2,6 +2,7 @@ package goatcounter
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -188,28 +189,29 @@ func (h *HitStats) List(
 	return total, totalUnique, totalDisplay, totalUniqueDisplay, more, nil
 }
 
-// Totalsgets the totals of all pages
-//
-// TODO: apply filter?
-func (h *HitStat) Totals(ctx context.Context, start, end time.Time, daily bool) (int, error) {
+// Totals gets the totals overview of all pages.
+func (h *HitStat) Totals(ctx context.Context, start, end time.Time, filter string, daily bool) (int, error) {
 	l := zlog.Module("loadTotals")
 	db := zdb.MustGet(ctx)
 	site := MustGetSite(ctx)
 
-	max := 0
+	query := `select hour, total, total_unique from hit_counts
+		where site=$1 and hour>=$2 and hour<=$3 `
+	args := []interface{}{site.ID, start.Format(zdb.Date), end.Format(zdb.Date)}
+	if filter != "" {
+		query += ` and (lower(path) like $4 or lower(title) like $4) `
+		args = append(args, "%"+filter+"%")
+	}
+	query += ` order by hour asc`
 
 	var tc []struct {
 		Hour        time.Time `db:"hour"`
 		Total       int       `db:"total"`
 		TotalUnique int       `db:"total_unique"`
 	}
-	err := db.SelectContext(ctx, &tc,
-		`select hour, total, total_unique from hit_counts
-				where site=$1 and hour>=$2 and hour<=$3
-				order by hour asc `,
-		site.ID, start.Format(zdb.Date), end.Format(zdb.Date))
+	err := db.SelectContext(ctx, &tc, query, args...)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("HitStat.Totals: %w", err)
 	}
 	l = l.Since("total overview query")
 
@@ -241,6 +243,7 @@ func (h *HitStat) Totals(ctx context.Context, start, end time.Time, daily bool) 
 		stats[d] = s
 	}
 
+	max := 0
 	for _, v := range stats {
 		totalst.Stats = append(totalst.Stats, v)
 		if daily && v.Daily > max {
@@ -253,6 +256,10 @@ func (h *HitStat) Totals(ctx context.Context, start, end time.Time, daily bool) 
 				}
 			}
 		}
+	}
+
+	if max < 10 {
+		max = 10
 	}
 
 	sort.Slice(totalst.Stats, func(i, j int) bool {

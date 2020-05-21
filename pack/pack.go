@@ -12387,6 +12387,11 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 		});
 	};
 
+	// Get the y-axis.
+	var get_max = function() {
+		return $('#scale').val()
+	}
+
 	// Reload the path list when typing in the filter input, so the user won't
 	// have to press "enter".
 	var filter_paths = function() {
@@ -12404,7 +12409,7 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 				$(e.target).after(loading)
 				jQuery.ajax({
 					url:     '/pages',
-					data:    append_period({filter: filter}),
+					data:    append_period({filter: filter, max: get_max()}),
 					success: function(data) {
 						update_pages(data, true)
 						loading.remove()
@@ -12431,6 +12436,7 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 						filter:  $('#filter-paths').val(),
 						daily:   $('#daily').is(':selected'),
 						exclude: $('.count-list-pages >tbody >tr').toArray().map((e) => e.id).join(','),
+						max:     $('#scale').val(),
 					}),
 					success: function(data) {
 						update_pages(data, false)
