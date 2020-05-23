@@ -66,7 +66,6 @@ func (h *HitStats) List(
 		}
 		totalErr = db.GetContext(ctx, &t, query, args...)
 		total, totalUnique = t.T, t.U
-		//l = l.Since("get total")
 	}()
 
 	// Select hits.
@@ -165,21 +164,17 @@ func (h *HitStats) List(
 				}
 			}
 		}
-		l = l.Since("add hit_stats")
 	}
 
 	// Fill in blank days.
 	fillBlankDays(hh, start, end)
-	l = l.Since("fill blanks")
 
 	// Apply TZ offset.
 	applyOffset(hh, *site)
-	l = l.Since("tz")
 
 	// Add total and max.
 	var totalDisplay, totalUniqueDisplay int
 	addTotals(hh, &totalDisplay, &totalUniqueDisplay)
-	l = l.Since("add totals")
 
 	syncutil.Wait(ctx, &wg)
 	if totalErr != nil {
@@ -191,7 +186,7 @@ func (h *HitStats) List(
 
 // Totals gets the totals overview of all pages.
 func (h *HitStat) Totals(ctx context.Context, start, end time.Time, filter string, daily bool) (int, error) {
-	l := zlog.Module("loadTotals")
+	l := zlog.Module("HitStat.Totals")
 	db := zdb.MustGet(ctx)
 	site := MustGetSite(ctx)
 
@@ -213,7 +208,7 @@ func (h *HitStat) Totals(ctx context.Context, start, end time.Time, filter strin
 	if err != nil {
 		return 0, fmt.Errorf("HitStat.Totals: %w", err)
 	}
-	l = l.Since("total overview query")
+	l = l.Since("total overview")
 
 	totalst := HitStat{
 		Path:  "",

@@ -318,7 +318,6 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 
 		total, totalUnique, totalDisplay, totalUniqueDisplay, morePages, pagesErr = pages.List(
 			r.Context(), start, end, filter, nil, daily)
-		//l = l.Since("pages.List")
 	}()
 
 	var (
@@ -339,21 +338,18 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	l = l.Since("browsers.List")
 
 	var systems goatcounter.Stats
 	totalSystems, err := systems.ListSystems(r.Context(), start, end)
 	if err != nil {
 		return err
 	}
-	l = l.Since("systems.List")
 
 	var sizeStat goatcounter.Stats
 	totalSize, err := sizeStat.ListSizes(r.Context(), start, end)
 	if err != nil {
 		return err
 	}
-	l = l.Since("sizeStat.ListSizes")
 
 	var locStat goatcounter.Stats
 	totalLoc, err := locStat.ListLocations(r.Context(), start, end)
@@ -361,14 +357,12 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	showMoreLoc := len(locStat) > 0 && float32(locStat[len(locStat)-1].Count)/float32(totalLoc)*100 < 3.0
-	l = l.Since("locStat.List")
 
 	var topRefs goatcounter.Stats
 	totalTopRefs, showMoreRefs, err := topRefs.ListRefs(r.Context(), start, end, 10, 0)
 	if err != nil {
 		return err
 	}
-	l = l.Since("topRefs.List")
 
 	// Add refers.
 	sr := r.URL.Query().Get("showrefs")
@@ -379,7 +373,6 @@ func (h backend) index(w http.ResponseWriter, r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		l = l.Since("refs.ListRefs")
 	}
 
 	subs, err := site.ListSubs(r.Context())
