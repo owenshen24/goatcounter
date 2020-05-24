@@ -12294,17 +12294,24 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 		$('#scale-reset').on('click', (e) => {
 			clearTimeout(t)
 			e.preventDefault()
-			$('#scale').val($('.count-list-pages').attr('data-max'))
+			$('#scale').val(get_max())
 			redraw()
 		})
 
-		var scale = parseInt($('#scale').val(), 10) / parseInt($('.count-list-pages').attr('data-max'), 10)
+		var scale = parseInt($('#scale').val(), 10) / parseInt(get_max(), 10)
 		$('.chart-bar').each(function(i, chart) {
 			if (chart.dataset.done === 't')
 				return
 
 			// Don't repaint/reflow on every bar update.
 			chart.style.display = 'none'
+
+			var c = '#9a15a4'
+			if ($(chart).is('.chart-totals')) {
+				//c = '#444'
+				//c = '#d60000' // dark red
+				//c = '#a02fe0' // blue-ish purple
+			}
 
 			$(chart).find('>div').each(function(i, bar) {
 				if (bar.dataset.h !== undefined)
@@ -12328,8 +12335,8 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 
 					bar.style.background = ` + "`" + `
 						linear-gradient(to top,
-						#9a15a4 0%,
-						#9a15a4 ${hu},
+						${c} 0%,
+						${c} ${hu},
 						#ddd ${hu},
 						#ddd ${h},
 						transparent ${h},
@@ -12387,9 +12394,9 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 		});
 	};
 
-	// Get the y-axis.
+	// Get the original y-axis max.
 	var get_max = function() {
-		return $('#scale').val()
+		return $('.count-list-pages').attr('data-max')
 	}
 
 	// Reload the path list when typing in the filter input, so the user won't
@@ -12409,7 +12416,10 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 				$(e.target).after(loading)
 				jQuery.ajax({
 					url:     '/pages',
-					data:    append_period({filter: filter, max: get_max()}),
+					data:    append_period({
+						filter: filter,
+						max:    get_max(),
+					}),
 					success: function(data) {
 						update_pages(data, true)
 						loading.remove()
@@ -12436,7 +12446,7 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 						filter:  $('#filter-paths').val(),
 						daily:   $('#daily').is(':selected'),
 						exclude: $('.count-list-pages >tbody >tr').toArray().map((e) => e.id).join(','),
-						max:     $('#scale').val(),
+						max:     get_max(),
 					}),
 					success: function(data) {
 						update_pages(data, false)
@@ -12447,12 +12457,29 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 		})
 	};
 
+	var org_totals;
+
 	// Update the page list from ajax request on pagination/filter.
 	var update_pages = function(data, from_filter) {
-		if (from_filter)
-			$('.pages-list .count-list-pages > tbody.pages').html(data.rows);
+		// TODO: when reloading from "?filter=xxx" with no matches there is no
+		// org_totals. Maybe just always load this from ajax instead of this
+		// swapping?
+		if (from_filter) {
+			var has_filter = !!$('#filter-paths').val()
+			$('.pages-list .count-list-pages > tbody.pages').html(data.rows)
+
+			if (!has_filter && org_totals) {
+				$('.pages-list .count-list-pages > tbody.totals').replaceWith(org_totals)
+				org_totals = null
+			}
+			else {
+				var old = $('.pages-list .count-list-pages > tbody.totals').replaceWith(data.totals)
+				if (!org_totals)
+					org_totals = old
+			}
+		}
 		else
-			$('.pages-list .count-list-pages > tbody.pages').append(data.rows);
+			$('.pages-list .count-list-pages > tbody.pages').append(data.rows)
 
 		highlight_filter($('#filter-paths').val())
 		$('.pages-list .load-more').css('display', data.more ? 'inline' : 'none')
@@ -12466,6 +12493,10 @@ http://nicolasgallagher.com/micro-clearfix-hack/
 			td.text(format_int(data.total_display));
 			tu.text(format_int(data.total_unique));
 			ud.text(format_int(data.total_unique_display));
+
+			// TODO: gets triggered, shouldn't do!
+			// TODO: after loading "?filter=asd" the scale is wrong.
+			//$('#scale').val(data.max)
 		}
 		else {
 			td.each((_, t) => {
@@ -13335,13 +13366,14 @@ form .err  { color: red; display: block; }
 
 /* Totals */
 .count-list .totals {
-	border-bottom: 1px solid #999;
 	background-color: #f7f7f7;
+	border-bottom: 1px solid #999;
 }
 
-.count-list .totals td:nth-child(2) {
-	font-weight: bold;
-}
+.count-list .totals td:nth-child(2) { font-weight: bold; }
+/*
+.totals .chart-bar > div            { background: red; }
+*/
 
 /* Hack to add margin to tbody */
 .count-list .pages::before { content: ''; display: block; height: 1rem; }
@@ -15511,6 +15543,24 @@ want to modify that in JavaScript; you can use <code>goatcounter.endpoint</code>
 	<div class="page">
 	{{- if .Flash}}<div class="flash flash-{{.Flash.Level}}">{{.Flash.Message}}</div>{{end -}}
 `),
+	"tpl/_backend_totals.gohtml": []byte(`<tbody class="totals"><tr>
+	<td>
+		<span title="Visits">{{nformat .TotalPages.CountUnique $.Site}}</span><br>
+		<span title="Pageviews" class="views">{{nformat .TotalPages.Count $.Site}}</span><br>
+	<td class="hide-mobile">
+		Total
+	</td>
+	<td>
+		<div class="show-mobile">
+			<strong>Total</strong>
+		</div>
+		<div class="chart chart-bar chart-totals">
+			<span class="half"></span>
+			{{bar_chart .Context .TotalPages.Stats .Max .Daily}}
+		</div>
+	</td>
+</tr></tbody>
+`),
 	"tpl/_bottom.gohtml": []byte(`		<script crossorigin="anonymous" src="{{.Static}}/imgzoom.js?v={{.Version}}"></script>
 		<script crossorigin="anonymous" src="{{.Static}}/script.js?v={{.Version}}"></script>
 	</div> {{/* .page */}}
@@ -15743,23 +15793,7 @@ Martin
 		</header>
 
 		<table class="count-list count-list-pages" data-max="{{.Max}}" data-scale="{{.Max}}">
-			<tbody class="totals">
-				<tr>
-					<td>
-						<span title="Visits">{{nformat .TotalPages.CountUnique $.Site}}</span><br>
-						<span title="Pageviews" class="views">{{nformat .TotalPages.Count $.Site}}</span><br>
-					<td>
-						Total
-					</td>
-					<td>
-						<div class="chart chart-bar">
-							<span class="half"></span>
-							{{bar_chart .Context .TotalPages.Stats .Max .Daily}}
-						</div>
-					</td>
-				</tr>
-			</tbody>
-
+			{{template "_backend_totals.gohtml" .}}
 			<tbody class="pages">{{template "_backend_pages.gohtml" .}}</tbody>
 		</table>
 

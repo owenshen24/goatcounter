@@ -111,13 +111,14 @@ form .err  { color: red; display: block; }
 
 /* Totals */
 .count-list .totals {
-	border-bottom: 1px solid #999;
 	background-color: #f7f7f7;
+	border-bottom: 1px solid #999;
 }
 
-.count-list .totals td:nth-child(2) {
-	font-weight: bold;
-}
+.count-list .totals td:nth-child(2) { font-weight: bold; }
+/*
+.totals .chart-bar > div            { background: red; }
+*/
 
 /* Hack to add margin to tbody */
 .count-list .pages::before { content: ''; display: block; height: 1rem; }

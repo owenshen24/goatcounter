@@ -194,7 +194,7 @@ func (h *HitStat) Totals(ctx context.Context, start, end time.Time, filter strin
 		where site=$1 and hour>=$2 and hour<=$3 `
 	args := []interface{}{site.ID, start.Format(zdb.Date), end.Format(zdb.Date)}
 	if filter != "" {
-		query += ` and (lower(path) like $4 or lower(title) like $4) `
+		query += ` and (lower(path) like lower($4) or lower(title) like lower($4)) `
 		args = append(args, "%"+filter+"%")
 	}
 	query += ` order by hour asc`
@@ -252,7 +252,6 @@ func (h *HitStat) Totals(ctx context.Context, start, end time.Time, filter strin
 			}
 		}
 	}
-
 	if max < 10 {
 		max = 10
 	}
@@ -261,11 +260,10 @@ func (h *HitStat) Totals(ctx context.Context, start, end time.Time, filter strin
 		return totalst.Stats[i].Day < totalst.Stats[j].Day
 	})
 
-	xx := []HitStat{totalst}
-	fillBlankDays(xx, start, end)
-	applyOffset(xx, *site)
-	*h = xx[0]
-
+	hh := []HitStat{totalst}
+	fillBlankDays(hh, start, end)
+	applyOffset(hh, *site)
+	*h = hh[0]
 	l = l.Since("total overview correct")
 
 	return max, nil

@@ -79,17 +79,24 @@
 		$('#scale-reset').on('click', (e) => {
 			clearTimeout(t)
 			e.preventDefault()
-			$('#scale').val($('.count-list-pages').attr('data-max'))
+			$('#scale').val(get_max())
 			redraw()
 		})
 
-		var scale = parseInt($('#scale').val(), 10) / parseInt($('.count-list-pages').attr('data-max'), 10)
+		var scale = parseInt($('#scale').val(), 10) / parseInt(get_max(), 10)
 		$('.chart-bar').each(function(i, chart) {
 			if (chart.dataset.done === 't')
 				return
 
 			// Don't repaint/reflow on every bar update.
 			chart.style.display = 'none'
+
+			var c = '#9a15a4'
+			if ($(chart).is('.chart-totals')) {
+				//c = '#444'
+				//c = '#d60000' // dark red
+				//c = '#a02fe0' // blue-ish purple
+			}
 
 			$(chart).find('>div').each(function(i, bar) {
 				if (bar.dataset.h !== undefined)
@@ -113,8 +120,8 @@
 
 					bar.style.background = `
 						linear-gradient(to top,
-						#9a15a4 0%,
-						#9a15a4 ${hu},
+						${c} 0%,
+						${c} ${hu},
 						#ddd ${hu},
 						#ddd ${h},
 						transparent ${h},
@@ -172,9 +179,9 @@
 		});
 	};
 
-	// Get the y-axis.
+	// Get the original y-axis max.
 	var get_max = function() {
-		return $('#scale').val()
+		return $('.count-list-pages').attr('data-max')
 	}
 
 	// Reload the path list when typing in the filter input, so the user won't
@@ -194,7 +201,10 @@
 				$(e.target).after(loading)
 				jQuery.ajax({
 					url:     '/pages',
-					data:    append_period({filter: filter, max: get_max()}),
+					data:    append_period({
+						filter: filter,
+						max:    get_max(),
+					}),
 					success: function(data) {
 						update_pages(data, true)
 						loading.remove()
@@ -221,7 +231,7 @@
 						filter:  $('#filter-paths').val(),
 						daily:   $('#daily').is(':selected'),
 						exclude: $('.count-list-pages >tbody >tr').toArray().map((e) => e.id).join(','),
-						max:     $('#scale').val(),
+						max:     get_max(),
 					}),
 					success: function(data) {
 						update_pages(data, false)
@@ -232,12 +242,29 @@
 		})
 	};
 
+	var org_totals;
+
 	// Update the page list from ajax request on pagination/filter.
 	var update_pages = function(data, from_filter) {
-		if (from_filter)
-			$('.pages-list .count-list-pages > tbody.pages').html(data.rows);
+		// TODO: when reloading from "?filter=xxx" with no matches there is no
+		// org_totals. Maybe just always load this from ajax instead of this
+		// swapping?
+		if (from_filter) {
+			var has_filter = !!$('#filter-paths').val()
+			$('.pages-list .count-list-pages > tbody.pages').html(data.rows)
+
+			if (!has_filter && org_totals) {
+				$('.pages-list .count-list-pages > tbody.totals').replaceWith(org_totals)
+				org_totals = null
+			}
+			else {
+				var old = $('.pages-list .count-list-pages > tbody.totals').replaceWith(data.totals)
+				if (!org_totals)
+					org_totals = old
+			}
+		}
 		else
-			$('.pages-list .count-list-pages > tbody.pages').append(data.rows);
+			$('.pages-list .count-list-pages > tbody.pages').append(data.rows)
 
 		highlight_filter($('#filter-paths').val())
 		$('.pages-list .load-more').css('display', data.more ? 'inline' : 'none')
@@ -251,6 +278,10 @@
 			td.text(format_int(data.total_display));
 			tu.text(format_int(data.total_unique));
 			ud.text(format_int(data.total_unique_display));
+
+			// TODO: gets triggered, shouldn't do!
+			// TODO: after loading "?filter=asd" the scale is wrong.
+			//$('#scale').val(data.max)
 		}
 		else {
 			td.each((_, t) => {

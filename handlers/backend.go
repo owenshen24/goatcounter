@@ -600,24 +600,51 @@ func (h backend) locations(w http.ResponseWriter, r *http.Request) error {
 func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 	site := goatcounter.MustGetSite(r.Context())
 
+	filter := r.URL.Query().Get("filter")
 	start, end, err := getPeriod(w, r, site)
 	if err != nil {
 		return err
 	}
 	daily, forcedDaily := getDaily(r, start, end)
-
-	var pages goatcounter.HitStats
-	totalHits, totalUnique, totalDisplay, totalUniqueDisplay, more, err := pages.List(
-		r.Context(), start, end,
-		r.URL.Query().Get("filter"),
-		strings.Split(r.URL.Query().Get("exclude"), ","),
-		daily)
+	m, err := strconv.ParseInt(r.URL.Query().Get("max"), 10, 64)
 	if err != nil {
 		return err
 	}
+	max := int(m)
 
-	// TODO: changing max doesn't apply properly? Hmm
-	max, err := strconv.ParseInt(r.URL.Query().Get("max"), 10, 64)
+	var (
+		wg         sync.WaitGroup
+		totalTpl   []byte
+		totalPages goatcounter.HitStat
+		totalErr   error
+	)
+	// Load new totals if there's a filter.
+	if filter != "" {
+		wg.Add(1)
+		go func() {
+			defer zlog.Recover()
+			defer wg.Done()
+
+			max, totalErr = totalPages.Totals(r.Context(), start, end, filter, daily)
+			if totalErr != nil {
+				return
+			}
+
+			totalTpl, totalErr = zhttp.ExecuteTpl("_backend_totals.gohtml", struct {
+				Context    context.Context
+				Site       *goatcounter.Site
+				TotalPages goatcounter.HitStat
+				Daily      bool
+				Max        int
+			}{r.Context(), site, totalPages, daily, max})
+		}()
+	}
+
+	var pages goatcounter.HitStats
+	totalHits, totalUnique, totalDisplay, totalUniqueDisplay, more, err := pages.List(
+		r.Context(), start, end, filter,
+		strings.Split(r.URL.Query().Get("exclude"), ","),
+		daily)
 	if err != nil {
 		return err
 	}
@@ -635,7 +662,7 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 		// Dummy values so template won't error out.
 		Refs     bool
 		ShowRefs string
-	}{r.Context(), pages, goatcounter.MustGetSite(r.Context()), start, end,
+	}{r.Context(), pages, site, start, end,
 		daily, forcedDaily, int(max), false, ""})
 	if err != nil {
 		return err
@@ -646,8 +673,14 @@ func (h backend) pages(w http.ResponseWriter, r *http.Request) error {
 		paths[i] = pages[i].Path
 	}
 
+	wg.Wait()
+	if totalErr != nil {
+		return totalErr
+	}
+
 	return zhttp.JSON(w, map[string]interface{}{
 		"rows":                 string(tpl),
+		"totals":               string(totalTpl),
 		"paths":                paths,
 		"total_hits":           totalHits,
 		"total_display":        totalDisplay,

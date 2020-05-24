@@ -148,23 +148,7 @@
 		</header>
 
 		<table class="count-list count-list-pages" data-max="{{.Max}}" data-scale="{{.Max}}">
-			<tbody class="totals">
-				<tr>
-					<td>
-						<span title="Visits">{{nformat .TotalPages.CountUnique $.Site}}</span><br>
-						<span title="Pageviews" class="views">{{nformat .TotalPages.Count $.Site}}</span><br>
-					<td>
-						Total
-					</td>
-					<td>
-						<div class="chart chart-bar">
-							<span class="half"></span>
-							{{bar_chart .Context .TotalPages.Stats .Max .Daily}}
-						</div>
-					</td>
-				</tr>
-			</tbody>
-
+			{{template "_backend_totals.gohtml" .}}
 			<tbody class="pages">{{template "_backend_pages.gohtml" .}}</tbody>
 		</table>
 
