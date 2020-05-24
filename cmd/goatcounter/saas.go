@@ -218,8 +218,8 @@ func flagErrors(errors string, v *zvalidate.Validator) {
 				defer zlog.Recover()
 				err := zmail.Send("GoatCounter Error",
 					mail.Address{Address: from},
-					[]mail.Address{{Address: to}},
-					zlog.Config.Format(l))
+					zmail.To(to),
+					zmail.Bodyf(zlog.Config.Format(l)))
 				if err != nil {
 					// Just output to stderr I guess, can't really do much more if
 					// zlog fails.

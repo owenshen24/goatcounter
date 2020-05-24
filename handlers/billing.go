@@ -65,8 +65,8 @@ func (h billing) index(w http.ResponseWriter, r *http.Request) error {
 				defer zlog.Recover()
 				zmail.Send("New GoatCounter subscription "+site.Plan,
 					mail.Address{Name: "GoatCounter Billing", Address: "billing@goatcounter.com"},
-					[]mail.Address{{Address: "billing@goatcounter.com"}},
-					fmt.Sprintf(`New subscription: %s (%d) %s`, site.Code, site.ID, *site.Stripe))
+					zmail.To("billing@goatcounter.com"),
+					zmail.Bodyf(`New subscription: %s (%d) %s`, site.Code, site.ID, *site.Stripe))
 			}()
 
 			zhttp.Flash(w, "Payment processed successfully!")
@@ -267,8 +267,8 @@ func (h billing) cancel(w http.ResponseWriter, r *http.Request) error {
 		defer zlog.Recover()
 		zmail.Send("GoatCounter cancellation",
 			mail.Address{Name: "GoatCounter Billing", Address: "billing@goatcounter.com"},
-			[]mail.Address{{Address: "billing@goatcounter.com"}},
-			fmt.Sprintf(`Cancelled: %s (%d) %s`, site.Code, site.ID, *site.Stripe))
+			zmail.To("billing@goatcounter.com"),
+			zmail.Bodyf(`Cancelled: %s (%d) %s`, site.Code, site.ID, *site.Stripe))
 	}()
 
 	zhttp.Flash(w, "Plan cancelled; you will be refunded for the remaining period.")

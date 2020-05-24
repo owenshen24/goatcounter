@@ -13,10 +13,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	"zgo.at/errors"
 	"zgo.at/goatcounter/cfg"
 	"zgo.at/guru"
 	"zgo.at/tz"
+	"zgo.at/utils/intutil"
 	"zgo.at/utils/jsonutil"
 	"zgo.at/zdb"
 	"zgo.at/zhttp"
@@ -70,6 +72,8 @@ type SiteSettings struct {
 	DateFormat       string      `json:"date_format"`
 	NumberFormat     rune        `json:"number_format"`
 	DataRetention    int         `json:"data_retention"`
+	EmailReports     intutil.Int `json:"email_reports"`
+	EmailReportsCc   string      `json:"email_reports"`
 	IgnoreIPs        zdb.Strings `json:"ignore_ips"`
 	Timezone         *tz.Zone    `json:"timezone"`
 	Campaigns        zdb.Strings `json:"campaigns"`
@@ -96,11 +100,24 @@ func (ss *SiteSettings) Scan(v interface{}) error {
 	}
 }
 
+// Settings.EmailReport
+const (
+	EmailReportOnce    = -1 // Email once after 2 weeks; for new sites.
+	EmailReportNever   = 0
+	EmailReportDaily   = 1
+	EmailReportWeekly  = 2
+	EmailReportBieekly = 2
+	EmailReportMonthly = 3
+)
+
+var EmailReports = []int{-1, 0, 1, 2, 3}
+
 // Defaults sets fields to default values, unless they're already set.
 func (s *Site) Defaults(ctx context.Context) {
 	// New site: Set default settings.
 	if s.ID == 0 {
 		s.Settings.Campaigns = []string{"utm_campaign", "utm_source", "ref"}
+		s.Settings.EmailReports = EmailReportOnce
 	}
 
 	if s.State == "" {
@@ -148,6 +165,9 @@ func (s *Site) Validate(ctx context.Context) error {
 
 	v.Range("settings.limits.page", int64(s.Settings.Limits.Page), 1, 25)
 	v.Range("settings.limits.ref", int64(s.Settings.Limits.Ref), 1, 25)
+	if !intutil.Contains(EmailReports, s.Settings.EmailReports.Int()) {
+		v.Append("settings.email_reports", "invalid value")
+	}
 
 	if s.Settings.DataRetention > 0 {
 		v.Range("settings.data_retention", int64(s.Settings.DataRetention), 14, 0)
@@ -506,6 +526,20 @@ func (s *Sites) List(ctx context.Context) error {
 	return errors.Wrap(zdb.MustGet(ctx).SelectContext(ctx, s,
 		`select * from sites where state=$1 order by created_at desc`,
 		StateActive), "Sites.List")
+}
+
+// ListIDs lists all sites with the given IDs.
+func (s *Sites) ListIDs(ctx context.Context, ids ...int64) error {
+	query, args, err := sqlx.In(
+		`select * from sites where state=? and id in (?) order by created_at desc`,
+		StateActive, ids)
+	if err != nil {
+		return fmt.Errorf("Sites.ListIDs: %w", err)
+	}
+
+	db := zdb.MustGet(ctx)
+	err = db.SelectContext(ctx, s, db.Rebind(query), args...)
+	return errors.Wrap(err, "Sites.ListIDs")
 }
 
 // ListCnames all sites that have CNAME set.

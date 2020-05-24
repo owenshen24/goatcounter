@@ -1050,8 +1050,8 @@ func (h backend) delete(w http.ResponseWriter, r *http.Request) error {
 
 				zmail.Send("GoatCounter deletion",
 					mail.Address{Name: "GoatCounter deletion", Address: cfg.EmailFrom},
-					[]mail.Address{{Address: cfg.EmailFrom}},
-					fmt.Sprintf(`Deleted: %s (%d): contact_me: %s; reason: %s`,
+					zmail.To(cfg.EmailFrom),
+					zmail.Bodyf(`Deleted: %s (%d): contact_me: %s; reason: %s`,
 						site.Code, site.ID, contact, args.Reason))
 			}()
 		}

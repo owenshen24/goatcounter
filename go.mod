@@ -2,6 +2,8 @@ module zgo.at/goatcounter
 
 go 1.13
 
+replace zgo.at/zhttp => ../zhttp
+
 require (
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/arp242/geoip2-golang v1.4.0
@@ -20,7 +22,7 @@ require (
 	zgo.at/guru v1.1.0
 	zgo.at/isbot v0.0.0-20200518180519-d9e7a12daaea
 	zgo.at/tz v0.0.0-20200520034804-aeba38d94d93
-	zgo.at/utils v0.0.0-20200514044306-bf7c1ff8aa0c
+	zgo.at/utils v0.0.0-20200524171306-5c9891cdb07f
 	zgo.at/zdb v0.0.0-20200518092829-2353fffa61c0
 	zgo.at/zhttp v0.0.0-20200520171239-2396be244f0c
 	zgo.at/zlog v0.0.0-20200519105857-4dc5e4ffe04c
