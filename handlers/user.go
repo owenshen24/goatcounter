@@ -16,12 +16,12 @@ import (
 
 	"github.com/go-chi/chi"
 	"golang.org/x/crypto/bcrypt"
+	"zgo.at/blackmail"
 	"zgo.at/goatcounter"
 	"zgo.at/goatcounter/cfg"
 	"zgo.at/guru"
 	"zgo.at/zdb"
 	"zgo.at/zhttp"
-	"zgo.at/zhttp/zmail"
 	"zgo.at/zlog"
 	"zgo.at/zvalidate"
 )
@@ -128,14 +128,19 @@ func (h user) requestReset(w http.ResponseWriter, r *http.Request) error {
 
 	go func() {
 		defer zlog.Recover()
-		err = zmail.SendTemplate(
+		body, err := zhttp.ExecuteTpl("email_password_reset.gotxt", struct {
+			Site goatcounter.Site
+			User goatcounter.User
+		}{*site, *u})
+		if err != nil {
+			zlog.Errorf("password reset: %s", err)
+			return
+		}
+		err = blackmail.Send(
 			fmt.Sprintf("Password reset for %s", site.Domain()),
 			mail.Address{Name: "GoatCounter login", Address: cfg.EmailFrom},
-			[]mail.Address{{Address: u.Email}},
-			"email_password_reset.gotxt", struct {
-				Site goatcounter.Site
-				User goatcounter.User
-			}{*site, *u})
+			blackmail.To(u.Email),
+			blackmail.BodyText(body))
 		if err != nil {
 			zlog.Errorf("password reset: %s", err)
 		}
@@ -375,15 +380,21 @@ func (h user) resendVerify(w http.ResponseWriter, r *http.Request) error {
 func sendEmailVerify(site *goatcounter.Site, user *goatcounter.User) {
 	go func() {
 		defer zlog.Recover()
-		err := zmail.SendTemplate("Verify your email",
-			mail.Address{Name: "GoatCounter", Address: cfg.EmailFrom},
-			[]mail.Address{{Address: user.Email}},
-			"email_verify.gotxt", struct {
-				Site goatcounter.Site
-				User goatcounter.User
-			}{*site, *user})
+		body, err := zhttp.ExecuteTpl("email_verify.gotxt", struct {
+			Site goatcounter.Site
+			User goatcounter.User
+		}{*site, *user})
 		if err != nil {
-			zlog.Errorf("zmail: %s", err)
+			zlog.Errorf("blackmail: %s", err)
+			return
+		}
+
+		err = blackmail.Send("Verify your email",
+			mail.Address{Name: "GoatCounter", Address: cfg.EmailFrom},
+			blackmail.To(user.Email),
+			blackmail.BodyText(body))
+		if err != nil {
+			zlog.Errorf("blackmail: %s", err)
 		}
 	}()
 }

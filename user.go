@@ -12,12 +12,12 @@ import (
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"zgo.at/blackmail"
 	"zgo.at/errors"
 	"zgo.at/goatcounter/cfg"
 	"zgo.at/guru"
 	"zgo.at/zdb"
 	"zgo.at/zhttp"
-	"zgo.at/zhttp/zmail"
 	"zgo.at/zlog"
 	"zgo.at/zvalidate"
 )
@@ -363,13 +363,14 @@ func (u *User) SendLoginMail(ctx context.Context, site *Site) {
 	go func() {
 		defer zlog.Recover()
 
-		err := zmail.Send("Your login URL",
+		err := blackmail.Send("Your login URL",
 			mail.Address{Name: "GoatCounter login", Address: cfg.EmailFrom},
-			[]mail.Address{{Address: u.Email}},
-			fmt.Sprintf("Hi there,\n\nYour login URL for GoatCounter is:\n\n  %s/user/login/%s\n\nGo to it to log in. This key is valid for one hour and can be used only once.\n",
+			blackmail.To(u.Email),
+			blackmail.Bodyf(
+				"Hi there,\n\nYour login URL for GoatCounter is:\n\n  %s/user/login/%s\n\nGo to it to log in. This key is valid for one hour and can be used only once.\n",
 				site.URL(), *u.LoginRequest))
 		if err != nil {
-			zlog.Errorf("zmail: %s", err)
+			zlog.Errorf("blackmail: %s", err)
 		}
 	}()
 }

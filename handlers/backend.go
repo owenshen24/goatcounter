@@ -22,6 +22,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/monoculum/formam"
+	"zgo.at/blackmail"
 	"zgo.at/errors"
 	"zgo.at/goatcounter"
 	"zgo.at/goatcounter/acme"
@@ -35,7 +36,6 @@ import (
 	"zgo.at/zdb"
 	"zgo.at/zhttp"
 	"zgo.at/zhttp/header"
-	"zgo.at/zhttp/zmail"
 	"zgo.at/zlog"
 	"zgo.at/zstripe"
 	"zgo.at/zvalidate"
@@ -1048,10 +1048,10 @@ func (h backend) delete(w http.ResponseWriter, r *http.Request) error {
 					}
 				}
 
-				zmail.Send("GoatCounter deletion",
+				blackmail.Send("GoatCounter deletion",
 					mail.Address{Name: "GoatCounter deletion", Address: cfg.EmailFrom},
-					[]mail.Address{{Address: cfg.EmailFrom}},
-					fmt.Sprintf(`Deleted: %s (%d): contact_me: %s; reason: %s`,
+					blackmail.To(cfg.EmailFrom),
+					blackmail.Bodyf(`Deleted: %s (%d): contact_me: %s; reason: %s`,
 						site.Code, site.ID, contact, args.Reason))
 			}()
 		}
